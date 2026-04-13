@@ -40,12 +40,7 @@ func (p *ClaudeCLIProvider) buildArgs(model, workDir, mcpConfigPath string, cliS
 	}
 
 	if effort != "" && effort != "off" {
-		effort = strings.ToLower(strings.TrimSpace(effort))
-		if isAlphaOnly(effort) {
-			args = append(args, "--effort", effort)
-		} else {
-			slog.Warn("claude-cli: invalid effort value, skipping --effort flag", "effort", effort)
-		}
+		args = append(args, "--effort", effort)
 	}
 
 	if mcpConfigPath != "" {
@@ -298,10 +293,11 @@ func ResetCLISession(baseWorkDir, sessionKey string) {
 // Behavioral tuning vars are whitelisted so they can be set system-wide
 // and picked up by claude-cli subprocesses.
 func filterCLIEnv(environ []string) []string {
+	// Env vars that should pass through to the claude-cli subprocess.
 	allowed := map[string]bool{
-		"CLAUDE_CODE_OAUTH_TOKEN":               true, // auth
-		"CLAUDE_CODE_EFFORT_LEVEL":              true, // behavioral tuning
-		"CLAUDE_CODE_DISABLE_ADAPTIVE_THINKING": true, // behavioral tuning
+		"CLAUDE_CODE_OAUTH_TOKEN":                 true, // auth
+		"CLAUDE_CODE_EFFORT_LEVEL":                true, // behavioral tuning
+		"CLAUDE_CODE_DISABLE_ADAPTIVE_THINKING":   true, // behavioral tuning
 	}
 	var filtered []string
 	for _, e := range environ {
