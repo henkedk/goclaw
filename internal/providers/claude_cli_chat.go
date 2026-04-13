@@ -59,7 +59,10 @@ func (p *ClaudeCLIProvider) Chat(ctx context.Context, req ChatRequest) (*ChatRes
 	cmd.Dir = workDir
 	cmd.Env = filterCLIEnv(os.Environ())
 	if effortLevel != "" && effortLevel != "off" {
+<<<<<<< HEAD
 		// Explicit --effort flag takes precedence; drop env to avoid ambiguity.
+=======
+>>>>>>> 69506609 (fix: sanitize --effort value (alpha-only) + strip CLAUDE_CODE_EFFORT_LEVEL env when agent effort is set)
 		cmd.Env = removeEnvKey(cmd.Env, "CLAUDE_CODE_EFFORT_LEVEL")
 	}
 	if stdin != nil {
