@@ -125,6 +125,11 @@ func resolveTeamTaskOutcome(
 				taskLocalKey = lk
 			}
 		}
+		if currentTask.Metadata != nil {
+			if lk, ok := currentTask.Metadata[tools.TaskMetaLocalKey].(string); ok && lk != "" {
+				taskLocalKey = lk
+			}
+		}
 	}
 
 	// Smart post-turn decision based on action flags.
