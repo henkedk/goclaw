@@ -334,7 +334,7 @@ func (p *CodexProvider) processSSEEvent(event *codexSSEEvent, result *ChatRespon
 				errMsg = fmt.Sprintf("codex: response failed: %s", event.Response.Error.Code)
 			}
 		}
-		return errors.New(errMsg)
+		return fmt.Errorf("%s", errMsg)
 	}
 	return nil
 }
