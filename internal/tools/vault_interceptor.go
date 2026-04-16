@@ -76,6 +76,15 @@ func (v *VaultInterceptor) AfterWrite(ctx context.Context, resolvedPath, content
 	docType := vault.InferDocType(relPath)
 	scope, teamID, agentOwned := inferScopeFromContext(ctx)
 
+	// Path-based override: teams/ paths must never be personal-scoped.
+	// This covers the case where an agent writes to a team workspace path
+	// but lacks a TeamID in its RunContext (e.g. delegation, solo session).
+	if strings.HasPrefix(relPath, "teams/") && scope == "personal" {
+		scope = "shared"
+		agentOwned = false
+		teamID = nil
+	}
+
 	// Team-scoped files belong to the team, not the creating agent.
 	var agentIDPtr *string
 	eventAgentID := ""
@@ -159,6 +168,13 @@ func (v *VaultInterceptor) AfterWriteMedia(ctx context.Context, resolvedPath, su
 
 	title := vault.InferTitle(relPath)
 	scope, teamID, agentOwned := inferScopeFromContext(ctx)
+
+	// Path-based override: teams/ paths must never be personal-scoped.
+	if strings.HasPrefix(relPath, "teams/") && scope == "personal" {
+		scope = "shared"
+		agentOwned = false
+		teamID = nil
+	}
 
 	var agentIDPtr *string
 	eventAgentID := ""
