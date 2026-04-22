@@ -39,13 +39,9 @@ func (p *ClaudeCLIProvider) buildArgs(model, workDir, mcpConfigPath string, cliS
 		"--verbose",
 	}
 
-	if effort != "" && effort != "off" {
-		effort = strings.ToLower(strings.TrimSpace(effort))
-		if isAlphaOnly(effort) {
-			args = append(args, "--effort", effort)
-		} else {
-			slog.Warn("claude-cli: invalid effort value, skipping --effort flag", "effort", effort)
-		}
+	effort = strings.ToLower(strings.TrimSpace(effort))
+	if effort != "" {
+		args = append(args, "--effort", effort)
 	}
 
 	if mcpConfigPath != "" {

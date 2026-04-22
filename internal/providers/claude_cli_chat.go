@@ -46,6 +46,10 @@ func (p *ClaudeCLIProvider) Chat(ctx context.Context, req ChatRequest) (*ChatRes
 		outputFmt = "stream-json"
 	}
 	effortLevel := extractStringOpt(req.Options, OptThinkingLevel)
+	// Agent config takes precedence; only use env var if config is empty
+	if effortLevel == "" {
+		effortLevel = os.Getenv("CLAUDE_CODE_EFFORT_LEVEL")
+	}
 	args := p.buildArgs(model, workDir, mcpPath, cliSessionID, outputFmt, len(images) > 0, disableTools, effortLevel)
 
 	var stdin *bytes.Reader
@@ -58,13 +62,6 @@ func (p *ClaudeCLIProvider) Chat(ctx context.Context, req ChatRequest) (*ChatRes
 	cmd := exec.CommandContext(ctx, p.cliPath, args...)
 	cmd.Dir = workDir
 	cmd.Env = filterCLIEnv(os.Environ())
-	if effortLevel != "" && effortLevel != "off" {
-<<<<<<< HEAD
-		// Explicit --effort flag takes precedence; drop env to avoid ambiguity.
-=======
->>>>>>> 69506609 (fix: sanitize --effort value (alpha-only) + strip CLAUDE_CODE_EFFORT_LEVEL env when agent effort is set)
-		cmd.Env = removeEnvKey(cmd.Env, "CLAUDE_CODE_EFFORT_LEVEL")
-	}
 	if stdin != nil {
 		cmd.Stdin = stdin
 	}
@@ -111,6 +108,10 @@ func (p *ClaudeCLIProvider) ChatStream(ctx context.Context, req ChatRequest, onC
 	bc := bridgeContextFromOpts(req.Options)
 	mcpPath := p.resolveMCPConfigPath(ctx, sessionKey, bc)
 	effortLevel := extractStringOpt(req.Options, OptThinkingLevel)
+	// Agent config takes precedence; only use env var if config is empty
+	if effortLevel == "" {
+		effortLevel = os.Getenv("CLAUDE_CODE_EFFORT_LEVEL")
+	}
 	args := p.buildArgs(model, workDir, mcpPath, cliSessionID, "stream-json", len(images) > 0, disableTools, effortLevel)
 
 	var stdin *bytes.Reader
@@ -124,9 +125,6 @@ func (p *ClaudeCLIProvider) ChatStream(ctx context.Context, req ChatRequest, onC
 	cmd.WaitDelay = 5 * time.Second // force-close pipes if process lingers after kill
 	cmd.Dir = workDir
 	cmd.Env = filterCLIEnv(os.Environ())
-	if effortLevel != "" && effortLevel != "off" {
-		cmd.Env = removeEnvKey(cmd.Env, "CLAUDE_CODE_EFFORT_LEVEL")
-	}
 	if stdin != nil {
 		cmd.Stdin = stdin
 	}
