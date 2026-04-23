@@ -92,6 +92,8 @@ type BridgeContext struct {
 	Workspace string
 	TenantID  string
 	LocalKey  string
+	SenderID  string
+	Role      string
 }
 
 // WriteMCPConfig writes a per-session MCP config file with agent context headers.
@@ -99,10 +101,10 @@ type BridgeContext struct {
 // outside the agent's workDir so tokens are not exposed.
 // Skips write if content is unchanged. Returns the file path.
 func (d *MCPConfigData) WriteMCPConfig(ctx context.Context, sessionKey string, bc BridgeContext) string {
-	return d.writeMCPConfigInternal(ctx, sessionKey, bc.AgentID, bc.UserID, bc.Channel, bc.ChatID, bc.PeerKind, bc.Workspace, bc.TenantID, bc.LocalKey)
+	return d.writeMCPConfigInternal(ctx, sessionKey, bc.AgentID, bc.UserID, bc.Channel, bc.ChatID, bc.PeerKind, bc.Workspace, bc.TenantID, bc.LocalKey, bc.SenderID, bc.Role)
 }
 
-func (d *MCPConfigData) writeMCPConfigInternal(ctx context.Context, sessionKey, agentID, userID, channel, chatID, peerKind, workspace, tenantID, localKey string) string {
+func (d *MCPConfigData) writeMCPConfigInternal(ctx context.Context, sessionKey, agentID, userID, channel, chatID, peerKind, workspace, tenantID, localKey, senderID, role string) string {
 	if d == nil || (len(d.Servers) == 0 && d.GatewayAddr == "" && d.AgentMCPLookup == nil) {
 		return ""
 	}
@@ -158,9 +160,15 @@ func (d *MCPConfigData) writeMCPConfigInternal(ctx context.Context, sessionKey, 
 		if sessionKey != "" && !strings.ContainsAny(sessionKey, "\r\n\x00") {
 			headers["X-Session-Key"] = sessionKey
 		}
+		if senderID != "" && !strings.ContainsAny(senderID, "\r\n\x00") {
+			headers["X-Sender-ID"] = senderID
+		}
+		if role != "" && !strings.ContainsAny(role, "\r\n\x00") {
+			headers["X-Role"] = role
+		}
 		// HMAC signature over all context fields to prevent header forgery
 		if d.GatewayToken != "" && (agentID != "" || userID != "") {
-			headers["X-Bridge-Sig"] = SignBridgeContext(d.GatewayToken, agentID, userID, channel, chatID, peerKind, workspace, tenantID, localKey, sessionKey)
+			headers["X-Bridge-Sig"] = SignBridgeContext(d.GatewayToken, agentID, userID, channel, chatID, peerKind, workspace, tenantID, localKey, sessionKey, senderID, role)
 		}
 
 		bridgeEntry := map[string]any{
@@ -276,31 +284,43 @@ func SignBridgeContext(key, agentID, userID, channel, chatID, peerKind, workspac
 }
 
 // VerifyBridgeContext checks the HMAC signature against the expected bridge context.
-// Returns (ok, tenantVerified): ok indicates signature is valid, tenantVerified indicates
-// the tenantID field was covered by the HMAC (only true at level 1).
-// Falls back to old formats for backward compatibility with sessions whose MCP config
-// was written before the workspace or tenantID fields were added.
-// Callers must NOT trust the tenantID header when tenantVerified is false.
-func VerifyBridgeContext(key, agentID, userID, channel, chatID, peerKind, workspace, tenantID, sig string, extra ...string) (bool, bool) {
-	// Current format: all fields including localKey
+// Returns (ok, tenantVerified, senderVerified):
+//   - ok: signature is valid
+//   - tenantVerified: tenantID was covered by the HMAC (not true for pre-tenantID sessions)
+//   - senderVerified: senderID/role were covered by the HMAC (not true for pre-sender sessions)
+//
+// extra must be passed as [localKey, sessionKey, senderID, role] for current sessions.
+// Falls back to older formats for backward compatibility.
+// Callers must NOT trust tenantID/senderID headers when the corresponding verified flag is false.
+func VerifyBridgeContext(key, agentID, userID, channel, chatID, peerKind, workspace, tenantID, sig string, extra ...string) (bool, bool, bool) {
+	// Current format: localKey, sessionKey, senderID, role
 	expected := SignBridgeContext(key, agentID, userID, channel, chatID, peerKind, workspace, tenantID, extra...)
 	if hmac.Equal([]byte(expected), []byte(sig)) {
-		return true, true
+		return true, true, true
+	}
+	// Fallback: pre-sender sessions (localKey + sessionKey only, no senderID/role)
+	var preSender []string
+	if len(extra) >= 2 {
+		preSender = extra[:2]
+	}
+	noSender := SignBridgeContext(key, agentID, userID, channel, chatID, peerKind, workspace, tenantID, preSender...)
+	if hmac.Equal([]byte(noSender), []byte(sig)) {
+		return true, true, false
 	}
 	// Fallback: without extra fields (pre-localKey sessions)
 	noExtra := SignBridgeContext(key, agentID, userID, channel, chatID, peerKind, workspace, tenantID)
 	if hmac.Equal([]byte(noExtra), []byte(sig)) {
-		return true, true
+		return true, true, false
 	}
 	// Fallback: without tenantID (pre-tenantID sessions)
 	noTenant := SignBridgeContext(key, agentID, userID, channel, chatID, peerKind, workspace, "")
 	if hmac.Equal([]byte(noTenant), []byte(sig)) {
-		return true, false
+		return true, false, false
 	}
 	// Fallback: without workspace or tenantID (oldest sessions)
-	old := SignBridgeContext(key, agentID, userID, channel, chatID, peerKind, "", "")
-	if hmac.Equal([]byte(old), []byte(sig)) {
-		return true, false
+	oldest := SignBridgeContext(key, agentID, userID, channel, chatID, peerKind, "", "")
+	if hmac.Equal([]byte(oldest), []byte(sig)) {
+		return true, false, false
 	}
-	return false, false
+	return false, false, false
 }

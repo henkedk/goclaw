@@ -103,6 +103,7 @@ func makeCronJobHandler(sched *scheduler.Scheduler, msgBus *bus.MessageBus, cfg 
 			ChatID:            job.DeliverTo,
 			PeerKind:          peerKind,
 			UserID:            job.UserID,
+			Role:              "operator",
 			RunID:             fmt.Sprintf("cron:%s", job.ID),
 			Stream:            false,
 			ExtraSystemPrompt: extraPrompt,

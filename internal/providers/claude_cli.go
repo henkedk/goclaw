@@ -38,6 +38,12 @@ const OptTenantID = "tenant_id"
 // OptLocalKey passes the composite local key (e.g. "-100123:topic:42") for forum topic routing.
 const OptLocalKey = "local_key"
 
+
+// OptSenderID passes the original sender ID (Telegram user ID, Discord member ID, etc.) for permission checks.
+const OptSenderID = "sender_id"
+
+// OptRole passes the caller's permission role (operator, admin, owner) to bypass per-user grants.
+const OptRole = "role"
 // ClaudeCLIProvider implements Provider by shelling out to the `claude` CLI binary.
 // It acts as a thin proxy: CLI manages session history, tool execution, and context.
 // GoClaw only forwards the latest user message and streams back the response.
