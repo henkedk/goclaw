@@ -92,6 +92,27 @@ func IsRetryableError(err error) bool {
 		return true
 	}
 
+	// Check for Codex stream-level failures (SSE response.failed events).
+	// The HTTP POST returns 200 OK so RetryDo never sees an HTTP error — the
+	// failure only surfaces as a plain error string inside the SSE event loop.
+	// Transient OpenAI backend errors are retryable; quota/policy/auth errors are not.
+	errLow := strings.ToLower(errStr)
+	if strings.Contains(errLow, "codex: response failed") {
+		// Non-retryable: quota, content policy, auth — retrying just burns more.
+		if strings.Contains(errLow, "content_policy") ||
+			strings.Contains(errLow, "content_filter") ||
+			strings.Contains(errLow, "policy_violation") ||
+			strings.Contains(errLow, "insufficient_quota") ||
+			strings.Contains(errLow, "quota_exceeded") ||
+			strings.Contains(errLow, "rate_limit") ||
+			strings.Contains(errLow, "invalid_request") ||
+			strings.Contains(errLow, "invalid_api_key") ||
+			strings.Contains(errLow, "unauthorized") {
+			return false
+		}
+		return true
+	}
+
 	return false
 }
 

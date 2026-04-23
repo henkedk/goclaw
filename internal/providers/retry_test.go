@@ -328,3 +328,82 @@ func TestHTTPError_ErrorString(t *testing.T) {
 		t.Fatalf("got %q, want %q", got, want)
 	}
 }
+
+// --- Codex SSE stream-level failure retry ---
+
+func TestIsRetryableError_CodexSSE(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{
+			name: "codex_response_failed_transient",
+			err:  fmt.Errorf("codex: response failed: An error occurred during generation"),
+			want: true,
+		},
+		{
+			name: "codex_response_failed_server_error",
+			err:  fmt.Errorf("codex: response failed: server error"),
+			want: true,
+		},
+		{
+			name: "codex_response_failed_content_policy",
+			err:  fmt.Errorf("codex: response failed: content_policy violation"),
+			want: false,
+		},
+		{
+			name: "codex_response_failed_content_filter",
+			err:  fmt.Errorf("codex: response failed: content_filter triggered"),
+			want: false,
+		},
+		{
+			name: "codex_response_failed_policy_violation",
+			err:  fmt.Errorf("codex: response failed: policy_violation"),
+			want: false,
+		},
+		{
+			name: "codex_response_failed_insufficient_quota",
+			err:  fmt.Errorf("codex: response failed: insufficient_quota"),
+			want: false,
+		},
+		{
+			name: "codex_response_failed_quota_exceeded",
+			err:  fmt.Errorf("codex: response failed: quota_exceeded"),
+			want: false,
+		},
+		{
+			name: "codex_response_failed_rate_limit",
+			err:  fmt.Errorf("codex: response failed: rate_limit_exceeded"),
+			want: false,
+		},
+		{
+			name: "codex_response_failed_invalid_request",
+			err:  fmt.Errorf("codex: response failed: invalid_request"),
+			want: false,
+		},
+		{
+			name: "codex_response_failed_invalid_api_key",
+			err:  fmt.Errorf("codex: response failed: invalid_api_key"),
+			want: false,
+		},
+		{
+			name: "codex_response_failed_unauthorized",
+			err:  fmt.Errorf("codex: response failed: unauthorized"),
+			want: false,
+		},
+		{
+			name: "non_codex_error_unchanged",
+			err:  fmt.Errorf("something went wrong"),
+			want: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := IsRetryableError(tt.err)
+			if got != tt.want {
+				t.Fatalf("IsRetryableError(%v) = %v, want %v", tt.err, got, tt.want)
+			}
+		})
+	}
+}
