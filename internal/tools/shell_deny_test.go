@@ -666,3 +666,67 @@ func TestLimitedBuffer(t *testing.T) {
 		}
 	})
 }
+
+func TestDenyPaths_GoclawBinExemption(t *testing.T) {
+	dataDir := t.TempDir()
+	workspace := filepath.Join(t.TempDir(), "workspace")
+	if err := os.MkdirAll(workspace, 0755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+
+	tool := &ExecTool{workspace: workspace}
+	tool.DenyPaths(dataDir, ".goclaw/")
+	tool.AllowPathExemptions(
+		".goclaw/skills-store/",
+		".goclaw/bin/",
+		filepath.Join(dataDir, "skills-store")+"/",
+	)
+
+	cases := []struct {
+		name  string
+		cmd   string
+		allow bool
+	}{
+		{"bin_script_allowed", "bash .goclaw/bin/otto-morning-checkin.sh", true},
+		{"bin_nested_allowed", "sh .goclaw/bin/subdir/helper.sh arg1", true},
+		{"skills_store_still_allowed", "python3 .goclaw/skills-store/my-skill/1/run.py", true},
+		{"workspace_still_denied", "cat .goclaw/workspace/memory.db", false},
+		{"root_still_denied", "ls .goclaw/", false},
+		{"memory_still_denied", "cat .goclaw/memory/notes.md", false},
+		{"bin_traversal_denied", "cat .goclaw/bin/../secrets.json", false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			normalizedCmd := normalizeCommand(tc.cmd)
+			denied := false
+			for _, pattern := range tool.pathDenyPatterns {
+				if !pattern.MatchString(normalizedCmd) {
+					continue
+				}
+				fields := parseExecCommandWords(strings.TrimSpace(normalizedCmd))
+				matchingFields, exemptFields := 0, 0
+				for _, field := range fields {
+					clean := strings.TrimSpace(field)
+					if !pattern.MatchString(clean) {
+						continue
+					}
+					matchingFields++
+					if matchesAnyPathExemption(clean, tool.denyExemptions, workspace) {
+						exemptFields++
+					}
+				}
+				if !(matchingFields > 0 && exemptFields == matchingFields) {
+					denied = true
+					break
+				}
+			}
+			if tc.allow && denied {
+				t.Errorf("cmd %q should be allowed but was denied", tc.cmd)
+			}
+			if !tc.allow && !denied {
+				t.Errorf("cmd %q should be denied but was allowed", tc.cmd)
+			}
+		})
+	}
+}

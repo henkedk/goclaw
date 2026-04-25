@@ -218,6 +218,7 @@ func setupToolRegistry(
 			// Allow skills execution: master-tenant skills-store + all tenant-scoped skills-store dirs.
 			et.AllowPathExemptions(
 				".goclaw/skills-store/",
+				".goclaw/bin/",
 				filepath.Join(dataDir, "skills-store")+"/",
 				filepath.Join(dataDir, "tenants")+"/",
 			)
